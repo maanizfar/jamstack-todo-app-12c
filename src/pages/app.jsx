@@ -1,17 +1,25 @@
 import React, { useContext } from "react"
-import { Router, Link } from "@reach/router"
+import { Router } from "@reach/router"
 import Dashboard from "../components/dashboard"
 import { IdentityContext } from "../identity-context"
 import { navigate } from "gatsby"
 
 export default props => {
-  const { identity } = useContext(IdentityContext)
+  const { user, identity } = useContext(IdentityContext)
 
-  identity.on("logout", () => navigate("/"))
+  if (typeof window !== "undefined") {
+    if (!user) {
+      navigate("/")
+    }
+
+    identity.on("logout", () => navigate("/"))
+  }
 
   return (
     <>
       <button onClick={() => identity.logout()}>Logout</button>
+      <div>Welcome, {user && user.user_metadata.full_name}</div>
+
       <Router>
         <Dashboard path="/app" />
       </Router>
