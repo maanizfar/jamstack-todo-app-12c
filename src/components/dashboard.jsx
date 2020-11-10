@@ -1,31 +1,71 @@
-import React, { useReducer, useState } from "react"
+import React, { useState } from "react"
+import { useQuery, useMutation, NetworkStatus } from "@apollo/client"
+import gql from "graphql-tag"
 
-const Dashboard = () => {
-  const [inputText, setInputText] = useState("")
-
-  const todosReducer = (state, action) => {
-    switch (action.type) {
-      case "addTodo":
-        return [{ title: inputText, done: false }, ...state]
-      case "toggleTodo":
-        const newState = [...state]
-        newState[action.payload] = {
-          done: !newState[action.payload].done,
-          title: newState[action.payload].title,
-        }
-
-        return newState
+const todosQuery = gql`
+  {
+    todos {
+      id
+      title
+      done
     }
   }
-  const [todos, dispatch] = useReducer(todosReducer, [])
+`
+
+const addTodoMutation = gql`
+  mutation addTodo($title: String!) {
+    addTodo(title: $title) {
+      id
+    }
+  }
+`
+const updateTodoMutation = gql`
+  mutation updateTodo($id: ID!, $done: Boolean!) {
+    updateTodo(id: $id, done: $done) {
+      id
+    }
+  }
+`
+
+const Dashboard = () => {
+  const { loading, error, data, networkStatus } = useQuery(todosQuery, {
+    notifyOnNetworkStatusChange: true,
+  })
+  const [addTodo] = useMutation(addTodoMutation)
+  const [updateTodo] = useMutation(updateTodoMutation)
+
+  const [inputText, setInputText] = useState("")
 
   const onAddTodoClick = () => {
     if (!inputText || !inputText.trim()) {
       return
     }
 
-    dispatch({ type: "addTodo" })
+    addTodo({
+      variables: {
+        title: inputText,
+      },
+      refetchQueries: [{ query: todosQuery }],
+    }).then(() => setInputText(""))
   }
+
+  const updateTodoClick = (id, value) => {
+    updateTodo({
+      variables: {
+        id,
+        done: value,
+      },
+      refetchQueries: [{ query: todosQuery }],
+    })
+  }
+
+  if (networkStatus === NetworkStatus.refetch) return <p>Refetching</p>
+
+  if (loading) return <p>Loading...</p>
+
+  if (error) return <p>Error: {error.message}</p>
+
+  const { todos } = data
 
   return (
     <div>
@@ -42,11 +82,13 @@ const Dashboard = () => {
         {todos &&
           todos.map((todo, i) => {
             return (
-              <li
-                key={i}
-                onClick={() => dispatch({ type: "toggleTodo", payload: i })}
-              >
-                <input type="checkbox" name="done" value={todo.done} />
+              <li key={i}>
+                <input
+                  type="checkbox"
+                  name="done"
+                  defaultChecked={todo.done}
+                  onChange={e => updateTodoClick(todo.id, e.target.checked)}
+                />
                 <p>{todo.title}</p>
               </li>
             )
